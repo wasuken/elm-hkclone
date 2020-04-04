@@ -1,10 +1,17 @@
 module Main exposing (main)
 
+import Bootstrap.Badge as Badge
+import Bootstrap.Button as Button
+import Bootstrap.CDN as CDN
+import Bootstrap.Card as Card
+import Bootstrap.Card.Block as CBlock
+import Bootstrap.Form.Input as Input
+import Bootstrap.Utilities.Display as Display
+import Bootstrap.Utilities.Size as Size
 import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Http
 import Http exposing (Error)
 import Json.Decode as Json
 import Task exposing (Task, andThen, sequence, succeed)
@@ -24,7 +31,8 @@ main =
 
 
 type alias Story =
-    { descendants : Int
+    { by : String
+    -- descendants : Int
     , id : Int
     , kids : List Int
     , score : Int
@@ -62,14 +70,18 @@ type Msg
     = GotIdList (Result Http.Error (List Int))
     | GotStoryInfo (Result Http.Error Story)
 
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GotIdList result ->
             case result of
                 Ok idList ->
-                   let c = (Cmd.batch (List.map (\id -> Http.get {url = getStoryInfoUrl (String.fromInt id), expect = Http.expectJson GotStoryInfo storyDecoder }) (List.take model.maxStoriesNum idList)))
-                   in ( { model
+                    let
+                        c =
+                            Cmd.batch (List.map (\id -> Http.get { url = getStoryInfoUrl (String.fromInt id), expect = Http.expectJson GotStoryInfo storyDecoder }) (List.take model.maxStoriesNum idList))
+                    in
+                    ( { model
                         | idList = idList
                         , dlStatus = Success
                         , stories = []
@@ -109,6 +121,21 @@ viewIdList model =
                 [ ul [] (List.map (\x -> li [] [ text (String.fromInt x) ]) model.idList) ]
 
 
+viewHNCard : Story -> Html Msg
+viewHNCard s =
+    Card.config [ Card.attrs [ Size.w75 ] ]
+        |> Card.header
+            []
+            [h3 [] [ a [ href s.url ] [ text s.title ] ]]
+        |> Card.block
+            []
+            [ CBlock.titleH4 [] [ text ("score:" ++ (String.fromInt s.score))
+            , text "  "
+            , text ("by " ++ s.by)]
+            ]
+        |> Card.view
+
+
 viewStories : Model -> Html Msg
 viewStories model =
     case model.dlStatus of
@@ -121,7 +148,7 @@ viewStories model =
 
         Success ->
             div []
-                [ ul [] (List.map (\x -> li [] [ text x.title ]) model.stories) ]
+                [ ul [] (List.map (\x -> viewHNCard x) model.stories) ]
 
 
 
@@ -148,10 +175,12 @@ getStoryIdList url =
         , expect = Http.expectJson GotIdList (Json.list Json.int)
         }
 
+
 storyDecoder : Json.Decoder Story
 storyDecoder =
     Json.map8 Story
-        (Json.field "descendants" Json.int)
+        -- (Json.field "descendants" Json.int)
+        (Json.field "by" Json.string)
         (Json.field "id" Json.int)
         (Json.oneOf
             [ Json.field "kids" (Json.list Json.int)
@@ -172,7 +201,8 @@ storyDecoder =
 view : Model -> Html Msg
 view model =
     div []
-        [ viewStories model ]
+        [ CDN.stylesheet
+        , viewStories model ]
 
 
 
