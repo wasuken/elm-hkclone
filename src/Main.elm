@@ -5,8 +5,9 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Http
+import Http exposing (Error)
 import Json.Decode as Json
-import Task
+import Task exposing (Task, andThen, sequence, succeed)
 
 
 main =
@@ -38,12 +39,13 @@ type alias Model =
     { stories : List Story
     , idList : List Int
     , dlStatus : DownloadStatus
+    , maxStoriesNum : Int
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Model [] [] Loading, getStoryIdList topStoryIdListUrl )
+    ( Model [] [] Loading 20, getStoryIdList topStoryIdListUrl )
 
 
 
@@ -60,19 +62,19 @@ type Msg
     = GotIdList (Result Http.Error (List Int))
     | GotStoryInfo (Result Http.Error Story)
 
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GotIdList result ->
             case result of
                 Ok idList ->
-                    ( { model
+                   let c = (Cmd.batch (List.map (\id -> Http.get {url = getStoryInfoUrl (String.fromInt id), expect = Http.expectJson GotStoryInfo storyDecoder }) (List.take model.maxStoriesNum idList)))
+                   in ( { model
                         | idList = idList
                         , dlStatus = Success
                         , stories = []
                       }
-                    , Cmd.none
+                    , c
                     )
 
                 Err _ ->
@@ -145,15 +147,6 @@ getStoryIdList url =
         { url = url
         , expect = Http.expectJson GotIdList (Json.list Json.int)
         }
-
-
--- getStoryInfo : String -> Cmd Msg
--- getStoryInfo =
---     Http.get
---         { url = getStoryInfoUrl
---         , expect = Http.expectJson GotStoryInfo storyDecoder
---         }
-
 
 storyDecoder : Json.Decoder Story
 storyDecoder =
